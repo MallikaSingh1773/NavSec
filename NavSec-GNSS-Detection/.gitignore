@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+env/
+.env/
+
+# Large generated output files (run main.py to regenerate)
+data_outputs/predictions.csv
+data_outputs/unsupervised_anomalies.csv
+visualization_outputs/interference_map.html
+
+# Trained model binary (large file)
+models/best_model.pkl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
