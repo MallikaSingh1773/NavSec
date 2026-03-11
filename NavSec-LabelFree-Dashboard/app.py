@@ -373,14 +373,39 @@ elif section == "⚠️ Attack Simulation":
             st.dataframe(pd.DataFrame(summary), use_container_width=True, hide_index=True)
 
     if not df_sim.empty:
+        st.markdown("### 🗺️ Simulation Map (Danger vs Safe)")
+        st.caption("Visualizing simulated attacks. Red = Detected as Interference (Danger), Green = Detected as Normal (Safe)")
+        
+        # Add Status Column to clearly state Danger or Safe
+        df_sim.insert(0, 'Status', df_sim['Predicted_Category'].apply(
+            lambda x: '🟢 SAFE' if x == 'Normal GNSS' else '🔴 DANGER'
+        ))
+        
+        fig_sim_map = px.scatter_mapbox(
+            df_sim, lat='lat', lon='lon', color='Status',
+            color_discrete_map={'🟢 SAFE': '#4ade80', '🔴 DANGER': '#f87171'},
+            hover_data=['Simulated_Attack', 'Predicted_Category'],
+            zoom=3.5, template='plotly_dark'
+        )
+        fig_sim_map.update_layout(
+            mapbox_style="carto-darkmatter", paper_bgcolor='rgba(0,0,0,0)',
+            height=450, margin=dict(t=0,b=0,l=0,r=0),
+        )
+        st.plotly_chart(fig_sim_map, use_container_width=True)
+
         st.markdown("### Full Simulation Dataset")
         # Ensure we only ask for columns that actually exist in the dataframe
-        desired_cols = ['Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'geoaltitude', 'velocity']
+        desired_cols = ['Status', 'Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'geoaltitude', 'velocity']
         present_cols = [c for c in desired_cols if c in df_sim.columns]
         other_cols   = [c for c in df_sim.columns if c not in present_cols]
         
+        def style_status(val):
+            if val == '🟢 SAFE': return 'color: #4ade80; font-weight: bold;'
+            if val == '🔴 DANGER': return 'color: #f87171; font-weight: bold;'
+            return ''
+            
         st.dataframe(
-            df_sim[present_cols + other_cols],
+            df_sim[present_cols + other_cols].style.map(style_status, subset=['Status']),
             use_container_width=True, hide_index=True
         )
     else:
