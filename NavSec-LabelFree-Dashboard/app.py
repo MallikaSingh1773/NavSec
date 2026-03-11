@@ -374,9 +374,13 @@ elif section == "⚠️ Attack Simulation":
 
     if not df_sim.empty:
         st.markdown("### Full Simulation Dataset")
+        # Ensure we only ask for columns that actually exist in the dataframe
+        desired_cols = ['Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'geoaltitude', 'velocity']
+        present_cols = [c for c in desired_cols if c in df_sim.columns]
+        other_cols   = [c for c in df_sim.columns if c not in present_cols]
+        
         st.dataframe(
-            df_sim[['Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'velocity'] + 
-                   [c for c in df_sim.columns if c not in ['Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'velocity']]],
+            df_sim[present_cols + other_cols],
             use_container_width=True, hide_index=True
         )
     else:
