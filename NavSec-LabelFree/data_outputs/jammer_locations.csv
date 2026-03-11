@@ -1,2 +1,2 @@
-estimated_lat,estimated_lon,num_points,interference_type
-40.756787,-73.515568,4740,GNSS Jamming
+cluster_id,estimated_lat,estimated_lon,num_points,interference_type,confidence_score
+0,40.756787,-73.515568,4740,GNSS Jamming,1.0

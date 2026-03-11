@@ -77,9 +77,12 @@ VIZ_DIR  = os.path.join(BASE, 'visualization_outputs')
 
 PRED_PATH   = os.path.join(DATA_DIR, 'predictions.csv')
 JAMMER_PATH = os.path.join(DATA_DIR, 'jammer_locations.csv')
+SIM_PATH    = os.path.join(DATA_DIR, 'simulation_results.csv')
+
 CM_PATH     = os.path.join(VIZ_DIR,  'confusion_matrix.png')
 FI_PATH     = os.path.join(VIZ_DIR,  'feature_importance.png')
 MAP_PATH    = os.path.join(VIZ_DIR,  'interference_map.html')
+HEATMAP_PATH= os.path.join(VIZ_DIR,  'interference_heatmap.html')
 
 # ─────────────────────────────────────────
 #  DATA LOADERS
@@ -91,6 +94,11 @@ def load_predictions():
 @st.cache_data
 def load_jammers():
     return pd.read_csv(JAMMER_PATH) if os.path.exists(JAMMER_PATH) else pd.DataFrame()
+
+@st.cache_data
+def load_simulations():
+    return pd.read_csv(SIM_PATH) if os.path.exists(SIM_PATH) else pd.DataFrame()
+
 
 df_pred   = load_predictions()
 df_jammers = load_jammers()
@@ -127,6 +135,8 @@ with st.sidebar:
         "🏠 System Overview",
         "🧠 Pipeline Explainer",
         "🗺️ Interference Map",
+        "🔥 Interference Heatmap",
+        "⚠️ Attack Simulation",
         "📊 Model Performance",
         "📈 Model Comparison",
         "🔵 Signal Distribution",
@@ -304,6 +314,76 @@ elif section == "🗺️ Interference Map":
 
 
 # ═══════════════════════════════════
+#  3.1 — INTERFERENCE HEATMAP
+# ═══════════════════════════════════
+elif section == "🔥 Interference Heatmap":
+    st.markdown("## 🔥 Interference Density Heatmap")
+    st.caption("Visualizing the concentration density of GNSS Jamming and Spoofing events.")
+    st.markdown("---")
+
+    if os.path.exists(HEATMAP_PATH):
+        with open(HEATMAP_PATH, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+        st.components.v1.html(html_content, height=630, scrolling=False)
+    else:
+        st.warning("⚠️ Heatmap not found. Run `python main.py` in NavSec-LabelFree first.")
+
+
+# ═══════════════════════════════════
+#  3.2 — ATTACK SIMULATION
+# ═══════════════════════════════════
+elif section == "⚠️ Attack Simulation":
+    st.markdown("## ⚠️ GNSS Attack Simulation")
+    st.caption("Inject artificial interference signatures into safe flight profiles and test model detection.")
+    st.markdown("---")
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.info("The simulation script modifies physical signal features (Doppler anomaly, RSS, trajectory jumps) "
+                "on a random subset of flights to mimic real-world attacks. We then pass these through the trained XGBoost model.")
+        if st.button("Run GNSS Attack Simulation", type="primary"):
+            import subprocess
+            with st.spinner("Generating simulated attacks & running model inference..."):
+                try:
+                    subprocess.run(["python", "simulation.py"], cwd=BASE, check=True)
+                    load_simulations.clear() # clear cache to reload
+                    st.success("Simulation Complete! Output updated.")
+                except Exception as e:
+                    st.error(f"Simulation failed: {e}")
+
+    with col2:
+        df_sim = load_simulations()
+        if not df_sim.empty:
+            st.markdown("### Simulation Results Summary")
+            
+            # Show summary
+            summary = []
+            for attack in ['Jamming', 'Spoofing', 'Weak']:
+                sub = df_sim[df_sim['Simulated_Attack'].str.contains(attack, case=False, na=False)]
+                if not sub.empty:
+                    top_pred = sub['Predicted_Category'].mode()[0]
+                    acc = (sub['Predicted_Category'] == top_pred).mean() * 100
+                    summary.append({
+                        'Simulated Attack': sub['Simulated_Attack'].iloc[0],
+                        'Num Records': len(sub),
+                        'Top Model Prediction': top_pred,
+                        'Detection Match Rate': f"{acc:.1f}%"
+                    })
+            
+            st.dataframe(pd.DataFrame(summary), use_container_width=True, hide_index=True)
+
+    if not df_sim.empty:
+        st.markdown("### Full Simulation Dataset")
+        st.dataframe(
+            df_sim[['Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'velocity'] + 
+                   [c for c in df_sim.columns if c not in ['Simulated_Attack', 'Predicted_Category', 'lat', 'lon', 'altitude', 'velocity']]],
+            use_container_width=True, hide_index=True
+        )
+    else:
+        st.warning("Click the button above to run the latest simulation.")
+
+
+# ═══════════════════════════════════
 #  4 — MODEL PERFORMANCE
 # ═══════════════════════════════════
 elif section == "📊 Model Performance":
@@ -472,7 +552,16 @@ elif section == "📍 Jammer Locations":
             st.plotly_chart(fig_map, use_container_width=True)
 
         st.markdown("### Full Data Table")
-        st.dataframe(df_jammers, use_container_width=True, hide_index=True)
+        
+        # Format confidence_score as percentage if exists
+        fmt = None
+        if 'confidence_score' in df_jammers.columns:
+            fmt = {'confidence_score': '{:.2%}'}
+            
+        if fmt:
+            st.dataframe(df_jammers.style.format(fmt), use_container_width=True, hide_index=True)
+        else:
+            st.dataframe(df_jammers, use_container_width=True, hide_index=True)
     else:
         st.warning("⚠️ jammer_locations.csv not found. Run `python main.py` in NavSec-LabelFree first.")
 

@@ -5,7 +5,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 import folium
-from folium.plugins import MarkerCluster
+from folium.plugins import MarkerCluster, HeatMap
 
 # Color mapping for interference types
 CATEGORY_COLORS = {
@@ -168,3 +168,69 @@ def create_interference_map(df_raw, pred_labels, jammer_locations,
 
     m.save(output_path)
     print(f"Saved interference map to {output_path}")
+
+
+def create_interference_heatmap(df_raw, pred_labels,
+                                 output_path='visualization_outputs/interference_heatmap.html'):
+    """
+    Create a Folium heatmap showing interference density across the airspace.
+
+    Uses HeatMap plugin applied to all GNSS Jamming + GNSS Spoofing coordinates.
+    Higher density areas appear as brighter/hotter zones on the map.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    df = df_raw.copy()
+    df['Predicted_Category'] = pred_labels
+    df = df.dropna(subset=['lat', 'lon'])
+
+    # Filter to anomalous (interference) records only
+    interference_types = ['GNSS Jamming', 'GNSS Spoofing']
+    df_interference = df[df['Predicted_Category'].isin(interference_types)]
+
+    if df_interference.empty:
+        print("  No interference points found for heatmap. Skipping.")
+        return
+
+    center_lat = df['lat'].median()
+    center_lon = df['lon'].median()
+
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=5,
+                   tiles='CartoDB dark_matter')
+
+    # Build heatmap point list [lat, lon, intensity]
+    heat_data = [[row['lat'], row['lon'], 1.0] for _, row in df_interference.iterrows()]
+
+    HeatMap(
+        heat_data,
+        radius=18,
+        blur=25,
+        max_zoom=10,
+        gradient={0.2: 'blue', 0.45: 'lime', 0.7: 'orange', 1.0: 'red'},
+    ).add_to(m)
+
+    # Add circle markers for jammer-type interference on top
+    for cat, color, size in [('GNSS Jamming', 'red', 5), ('GNSS Spoofing', 'orange', 5)]:
+        for _, row in df[df['Predicted_Category'] == cat].iterrows():
+            folium.CircleMarker(
+                location=[row['lat'], row['lon']],
+                radius=size, color=color, fill=True, fill_color=color,
+                fill_opacity=0.3, weight=0.3
+            ).add_to(m)
+
+    # Legend
+    legend_html = """
+    <div style="position:fixed; bottom:30px; left:30px; z-index:1000;
+                background:rgba(0,0,0,0.8); padding:12px 18px;
+                border-radius:8px; color:white; font-size:13px; font-family:Arial;">
+        <b>NavSec — Interference Density Heatmap</b><br><br>
+        <span style="color:#ff4444;">Hot (Red)</span> = High density jamming/spoofing<br>
+        <span style="color:#ff9800;">Warm (Orange)</span> = Medium density<br>
+        <span style="color:#00ff88;">Cool (Green)</span> = Low density<br>
+        <span style="color:#4488ff;">Cold (Blue)</span> = Sparse interference
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(legend_html))
+    m.save(output_path)
+    print(f"Saved interference heatmap to {output_path}")
+

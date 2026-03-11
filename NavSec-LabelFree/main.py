@@ -8,9 +8,11 @@ from label_free_clustering import run_label_free_clustering
 from train_model           import train_and_evaluate
 from detect_interference   import predict_interference
 from jammer_localization   import estimate_jammer_location
+from simulation            import run_all_simulations
 from visualization         import (plot_confusion_matrix,
                                    plot_feature_importance,
-                                   create_interference_map)
+                                   create_interference_map,
+                                   create_interference_heatmap)
 
 DATASET_PATH = 'dataset/Data.xlsx'
 
@@ -115,6 +117,13 @@ def main():
         output_path='visualization_outputs/feature_importance.png'
     )
 
+    # Interference heatmap
+    create_interference_heatmap(
+        df_raw_engineered,
+        pred_labels,
+        output_path='visualization_outputs/interference_heatmap.html'
+    )
+
     # Interactive map
     create_interference_map(
         df_raw_engineered,
@@ -123,15 +132,27 @@ def main():
         output_path='visualization_outputs/interference_map.html'
     )
 
+    # ─────────────────────────────────────────────
+    # PHASE 8: GNSS ATTACK SIMULATION
+    # ─────────────────────────────────────────────
+    print("\n--- Phase 8: GNSS Attack Simulation ---")
+    feature_cols = [c for c in X_norm.columns]
+    run_all_simulations(
+        df_raw_engineered, best_model, label_encoder,
+        feature_cols=feature_cols, num_samples=200
+    )
+
     print("\n" + "=" * 60)
-    print("  Processing Complete — All outputs saved!")
+    print("  Processing Complete -- All outputs saved!")
     print("=" * 60)
     print("\nOutput Files:")
     print("  data_outputs/predictions.csv")
-    print("  data_outputs/jammer_locations.csv")
+    print("  data_outputs/jammer_locations.csv       (+ confidence_score)")
+    print("  data_outputs/simulation_results.csv     (NEW)")
     print("  visualization_outputs/confusion_matrix.png")
     print("  visualization_outputs/feature_importance.png")
     print("  visualization_outputs/interference_map.html")
+    print("  visualization_outputs/interference_heatmap.html (NEW)")
     print("  models/best_model.pkl")
 
 
